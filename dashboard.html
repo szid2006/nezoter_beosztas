@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <script>
+    let workerCount = 0;
+    let showCount = 0;
+
+    function addWorker() {
+        const container = document.getElementById("workers_form");
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <b>Dolgozó</b><br>
+
+            <label>Név:
+                <input type="text" name="name_${workerCount}" required>
+            </label><br>
+
+            <label>Nem ér rá (több nap, vesszővel):
+                <br>
+                <small>Pl.: 2025-01-03, 2025-01-05</small><br>
+                <input type="text" name="unavail_${workerCount}" style="width:400px">
+            </label><br>
+
+            <label>Melyik előadást akarja megnézni:
+                <input type="text" name="wants_${workerCount}">
+            </label><br>
+
+            <label>ÉK:
+                <input type="checkbox" name="ek_${workerCount}">
+            </label>
+            <hr>
+        `;
+        container.appendChild(div);
+        workerCount++;
+        document.getElementById("num_workers").value = workerCount;
+    }
+
+    function addShow() {
+        const container = document.getElementById("shows_form");
+        const div = document.createElement("div");
+
+        div.innerHTML = `
+            <b>Műszak</b><br>
+
+            <label>Előadás címe:
+                <input type="text" name="title_${showCount}" required>
+            </label><br>
+
+            <label>Dátum és idő (YYYY-MM-DD HH:MM):
+                <input type="text" name="date_${showCount}" placeholder="2025-01-05 19:00" required>
+            </label><br>
+
+            <label>Hány ember kell:
+                <input type="number" name="need_${showCount}" min="1" max="10" value="10" 
+                       onchange="toggleErkely(this, ${showCount})">
+            </label><br>
+
+            <div id="roles_${showCount}">
+                <label><input type="checkbox" name="role_beulos_${showCount}"> Nézőtér beülős</label><br>
+                <label><input type="checkbox" name="role_csipog_${showCount}"> Nézőtér csak csipog</label><br>
+                <label><input type="checkbox" name="role_jolly_${showCount}"> Jolly joker</label><br>
+                <label><input type="checkbox" name="role_bal_${showCount}"> Ruhatár bal</label><br>
+                <label><input type="checkbox" name="role_jobb_${showCount}"> Ruhatár jobb</label><br>
+                <label id="erkely_label_${showCount}">
+                    <input type="checkbox" name="role_erkely_${showCount}"> Ruhatár erkély
+                </label>
+            </div>
+
+            <hr>
+        `;
+        container.appendChild(div);
+        showCount++;
+        document.getElementById("num_shows").value = showCount;
+    }
+
+    function toggleErkely(input, index) {
+        const label = document.getElementById(`erkely_label_${index}`);
+        if (parseInt(input.value) >= 9) {
+            label.style.display = "block";
+        } else {
+            label.style.display = "none";
+            label.querySelector("input").checked = false;
+        }
+    }
+    </script>
+</head>
+
+<body>
+
+<h2>Beosztás adatok</h2>
+
+<form method="POST">
+
+<h3>Dolgozók</h3>
+<input type="hidden" id="num_workers" name="num_workers" value="0">
+<div id="workers_form"></div>
+<button type="button" onclick="addWorker()">➕ Dolgozó hozzáadása</button>
+
+<hr>
+
+<h3>Műszakok</h3>
+<input type="hidden" id="num_shows" name="num_shows" value="0">
+<div id="shows_form"></div>
+<button type="button" onclick="addShow()">➕ Műszak hozzáadása</button>
+
+<br><br>
+<button type="submit">📅 Beosztás generálása</button>
+
+</form>
+
+</body>
+</html>
