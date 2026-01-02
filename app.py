@@ -6,8 +6,8 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = "titkos"
 
-USERNAME = "admin"
-PASSWORD = "admin"
+USERNAME = "Szakács Zsuzsi"
+PASSWORD = "1234"
 
 workers_list = []
 shows_list = []
