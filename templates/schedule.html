@@ -7,11 +7,11 @@
 
 <h2>Generált beosztás</h2>
 
-{% for show in schedule %}
-    <h3>{{ show.title }} – {{ show.date }}</h3>
+{% for show_title, roles in schedule.items() %}
+    <h3>{{ show_title }}</h3>
 
     <ul>
-    {% for role, names in show.roles.items() %}
+    {% for role, names in roles.items() %}
         <li>
             <b>{{ role }}:</b>
             {% if names %}
