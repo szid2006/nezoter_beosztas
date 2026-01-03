@@ -9,6 +9,8 @@ app.secret_key = "titkos"
 
 USERNAME = "Szabó Szidónia"
 PASSWORD = "12345"
+USERNAME = "Szakács Zsuzsi"
+PASSWORD = "1234"
 
 workers_list = []
 shows_list = []
