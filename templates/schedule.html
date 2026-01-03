@@ -1,37 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="hu">
 <head>
+    <meta charset="UTF-8">
     <title>Beosztás</title>
 </head>
+
 <body>
 
 <h2>Generált beosztás</h2>
 
-{% for show_title, roles in schedule.items() %}
-    <h3>{{ show_title }}</h3>
+{% if schedule %}
+    {% for show_title, roles in schedule.items() %}
+        <h3>{{ show_title }}</h3>
 
-    <ul>
-    {% for role, names in roles.items() %}
-        <li>
-            <b>{{ role }}:</b>
-            {% if names %}
-                {{ names | join(", ") }}
-            {% else %}
-                —
-            {% endif %}
-        </li>
+        <ul>
+        {% for role, names in roles.items() %}
+            <li>
+                <b>{{ role }}:</b>
+                {% if names %}
+                    {{ names | join(", ") }}
+                {% else %}
+                    —
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+
+        <hr>
     {% endfor %}
-    </ul>
-    <hr>
-{% endfor %}
-    <br>
-<a href="{{ url_for('export_csv') }}">
-    📄 CSV letöltése
-</a>
+{% else %}
+    <p><i>Nincs megjeleníthető beosztás.</i></p>
+{% endif %}
 
+<br>
 
+<a href="{{ url_for('export_csv') }}">📄 CSV letöltése</a>
+&nbsp;&nbsp;|&nbsp;&nbsp;
 <a href="{{ url_for('dashboard') }}">🔙 Vissza a főoldalra</a>
 
 </body>
 </html>
-
