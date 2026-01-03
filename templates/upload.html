@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel feltöltés</title>
+</head>
+<body>
+
+<h2>Excel beosztás feltöltése</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".xlsx" required>
+    <br><br>
+    <button type="submit">📤 Feltöltés</button>
+</form>
+
+<br>
+<a href="{{ url_for('dashboard') }}">🔙 Vissza</a>
+
+</body>
+</html>
