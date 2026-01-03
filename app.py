@@ -5,6 +5,8 @@ from datetime import datetime
 import csv
 import os
 import traceback
+from openpyxl import load_workbook
+
 
 app = Flask(__name__)
 app.secret_key = "titkos"
