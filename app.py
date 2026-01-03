@@ -9,9 +9,15 @@ import traceback
 app = Flask(__name__)
 app.secret_key = "titkos"
 
+# ─────────────────────────────
+# BELÉPÉSI ADATOK
+# ─────────────────────────────
 USERNAME = "Szakács Zsuzsi"
 PASSWORD = "1234"
 
+# ─────────────────────────────
+# ADATTÁROLÁS
+# ─────────────────────────────
 workers_list = []
 shows_list = []
 
@@ -38,11 +44,12 @@ def dashboard():
         workers_list.clear()
         shows_list.clear()
 
-        # Dolgozók
+        # ───── DOLGOZÓK ─────
         num_workers = int(request.form.get("num_workers", 0))
         for i in range(num_workers):
             name = request.form.get(f"name_{i}")
-            if not name: continue
+            if not name:
+                continue
             wants = request.form.get(f"wants_{i}") or None
             is_ek = f"ek_{i}" in request.form
             raw = request.form.get(f"unavail_{i}", "")
@@ -55,15 +62,16 @@ def dashboard():
                     pass
             workers_list.append(worker)
 
-        # Előadások
+        # ───── ELŐADÁSOK ─────
         num_shows = int(request.form.get("num_shows", 0))
         for j in range(num_shows):
             title = request.form.get(f"title_{j}")
             raw_dt = request.form.get(f"date_{j}")
             try:
-                dt = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M")
+                start = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M")
             except Exception:
                 continue
+
             need = int(request.form.get(f"need_{j}", 10))
             roles = [
                 Role("Nézőtér beülős", min(2, need)),
@@ -74,15 +82,13 @@ def dashboard():
                 Role("Ruhatár erkély", 1 if need >= 9 else 0),
             ]
             roles = [r for r in roles if r.max_count > 0]
-            shows_list.append(Show(title, dt, roles))
+            shows_list.append(Show(title, start, roles))
 
         return redirect(url_for("schedule"))
 
     return render_template("dashboard.html")
 
-# ─────────────────────────────
-# BEOSZTÁS GENERÁLÁS
-# ─────────────────────────────
+# ───────────── BEOSZTÁS GENERÁLÁS ─────────────
 def generate_schedule(workers, shows):
     schedule = defaultdict(dict)
     assigned_by_date = defaultdict(list)
@@ -90,38 +96,39 @@ def generate_schedule(workers, shows):
 
     # Súlyozás: ÉK ritkábban
     for worker in workers:
-        worker.weight = 1 if not worker.is_ek else 0.3  # ÉK ritkábban
+        worker.weight = 0.2 if worker.is_ek else 1
 
-    shows_sorted = sorted(shows, key=lambda s: s.dt)  # hibamentes
+    shows_sorted = sorted(shows, key=lambda s: s.start)
 
     for show in shows_sorted:
-        assigned_in_show = set()
+        assigned_in_show = set()  # Már beosztott dolgozók ebben a műszakban
 
         for role in show.roles:
             # Elérhető dolgozók
             available = [
                 w for w in workers
-                if show.dt.date() not in w.unavailable_dates and w not in assigned_in_show
+                if show.start.date() not in w.unavailable_dates
+                and w not in assigned_in_show
             ]
 
             # Max 1 ÉK/nap
-            num_ek_today = sum(1 for w in assigned_by_date[show.dt.date()] if w.is_ek)
+            num_ek_today = sum(1 for w in assigned_by_date[show.start.date()] if w.is_ek)
             if num_ek_today >= 1:
                 available = [w for w in available if not w.is_ek]
 
             # Max 3 egymás utáni nap
             filtered = []
             for w in available:
-                dates = sorted(last_assigned_dates[w])
-                if len(dates) < 3:
+                last_dates = sorted(last_assigned_dates[w])
+                if len(last_dates) < 3:
                     filtered.append(w)
                     continue
-                if (dates[-1] - dates[-2]).days == 1 and (dates[-2] - dates[-3]).days == 1:
+                if (last_dates[-1] - last_dates[-2]).days == 1 and (last_dates[-2] - last_dates[-3]).days == 1:
                     continue
                 filtered.append(w)
             available = filtered
 
-            # Súlyozott választás (ÉK ritkábban)
+            # Súlyozás ÉK ritkábban
             weighted = []
             for w in available:
                 count = max(int(w.weight * 10), 1)
@@ -131,18 +138,16 @@ def generate_schedule(workers, shows):
                 schedule[show.title][role.name] = []
                 continue
 
-            # Assign role
+            # Szerepbeosztás: egy műszakban nem ismétlődik ugyanaz a dolgozó
             assign_count = min(role.max_count, len(weighted))
             assigned = random.sample(weighted, assign_count)
 
-            # Ne legyen ugyanaz az ember többször ugyanabban a show-ban
-            assigned = list({w for w in assigned})
-
             schedule[show.title][role.name] = [w.name for w in assigned]
-            assigned_by_date[show.dt.date()].extend(assigned)
+            assigned_by_date[show.start.date()].extend(assigned)
             assigned_in_show.update(assigned)
+
             for w in assigned:
-                last_assigned_dates[w].append(show.dt.date())
+                last_assigned_dates[w].append(show.start.date())
 
     return schedule
 
