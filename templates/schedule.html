@@ -24,8 +24,14 @@
     </ul>
     <hr>
 {% endfor %}
+    <br>
+<a href="{{ url_for('export_csv') }}">
+    📄 CSV letöltése
+</a>
+
 
 <a href="{{ url_for('dashboard') }}">🔙 Vissza a főoldalra</a>
 
 </body>
 </html>
+
