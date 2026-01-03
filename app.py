@@ -105,13 +105,14 @@ def schedule():
         return redirect(url_for("login"))
 
     try:
-        # ─── Súlyozott beosztás: ÉK dolgozók ritkábban ───
+        # ─── Súlyozott beosztás és ÉK napi limit ───
         for worker in workers_list:
-            # weight=1 a normál dolgozó, weight=0.5 az ÉK dolgozó
-            worker.weight = 0.2 if worker.is_ek
-            else 1
+            # weight=1 a normál dolgozó, weight=0.2 az ÉK dolgozó
+            worker.weight = 0.2 if worker.is_ek else 1
 
-        # generate_schedule használja a weight attribútumot
+        # A generate_schedule-ben figyelembe kell venni:
+        # - worker.weight
+        # - hogy egy napra max 1 ÉK kerüljön beosztásra
         result = generate_schedule(workers_list, shows_list)
         return render_template("schedule.html", schedule=result)
     except Exception:
