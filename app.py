@@ -86,7 +86,7 @@ def dashboard():
                 Role("Nézőtér csak csipog", min(2, max(0, need - 2))),
                 Role("Jolly joker", 1 if need >= 5 else 0, ek_allowed=False),
                 Role("Ruhatár bal", min(2, max(0, need - 5))),
-                Role("Ruhatár jobb", 1 if need >= 7 else 0),
+                Role("Ruhatár jobb", 1 if need >= 8 else 0),
                 Role("Ruhatár erkély", 1 if need >= 9 else 0),
             ]
             roles = [r for r in roles if r.max_count > 0]
@@ -105,6 +105,12 @@ def schedule():
         return redirect(url_for("login"))
 
     try:
+        # ─── Súlyozott beosztás: ÉK dolgozók ritkábban ───
+        for worker in workers_list:
+            # weight=1 a normál dolgozó, weight=0.5 az ÉK dolgozó
+            worker.weight = 0.5 if worker.is_ek else 1
+
+        # generate_schedule használja a weight attribútumot
         result = generate_schedule(workers_list, shows_list)
         return render_template("schedule.html", schedule=result)
     except Exception:
