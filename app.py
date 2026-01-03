@@ -87,7 +87,7 @@ def dashboard():
                 Role("Jolly joker", 1 if need >= 5 else 0, ek_allowed=False),
                 Role("Ruhatár bal", min(2, max(0, need - 5))),
                 Role("Ruhatár jobb", 1 if need >= 7 else 0),
-                Role("Ruhatár erkély", 1 if need >= 8 else 0),
+                Role("Ruhatár erkély", 1 if need >= 9 else 0),
             ]
             roles = [r for r in roles if r.max_count > 0]
             shows_list.append(Show(title, dt, roles))
