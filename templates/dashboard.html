@@ -62,7 +62,7 @@
                 <label><input type="checkbox" name="role_jolly_${showCount}"> Jolly joker</label><br>
                 <label><input type="checkbox" name="role_bal_${showCount}"> Ruhatár bal</label><br>
                 <label><input type="checkbox" name="role_jobb_${showCount}"> Ruhatár jobb</label><br>
-                <label id="erkely_label_${showCount}">
+                <label id="erkely_label_${showCount}" style="display:none;">
                     <input type="checkbox" name="role_erkely_${showCount}"> Ruhatár erkély
                 </label>
             </div>
@@ -90,6 +90,15 @@
 
 <h2>Beosztás adatok</h2>
 
+<!-- 🔹 EXCEL OPCIÓ -->
+<p>
+<b>📊 Excelből szeretnéd betölteni az adatokat?</b><br>
+<a href="{{ url_for('upload_excel') }}">➡ Excel feltöltése</a>
+</p>
+
+<hr>
+
+<!-- 🔹 KÉZI ADATBEVITEL -->
 <form method="POST">
 
 <h3>Dolgozók</h3>
