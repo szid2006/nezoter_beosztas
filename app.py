@@ -2,17 +2,17 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from models import Worker, Role, Show
 from main import generate_schedule
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 app.secret_key = "titkos"
 
-USERNAME = "Szakács Zsuzsi"
-PASSWORD = "1234"
 USERNAME = "Szabó Szidónia"
 PASSWORD = "12345"
 
 workers_list = []
 shows_list = []
+
 
 # ─────────────────────────────
 # LOGIN
@@ -21,8 +21,8 @@ shows_list = []
 def login():
     if request.method == "POST":
         if (
-            request.form["username"] == USERNAME
-            and request.form["password"] == PASSWORD
+            request.form.get("username") == USERNAME
+            and request.form.get("password") == PASSWORD
         ):
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
@@ -41,34 +41,43 @@ def dashboard():
         workers_list.clear()
         shows_list.clear()
 
-        # ───────── DOLGOZÓK ─────────
+        # ───── DOLGOZÓK ─────
         num_workers = int(request.form.get("num_workers", 0))
 
         for i in range(num_workers):
             name = request.form.get(f"name_{i}")
+            if not name:
+                continue
+
             wants = request.form.get(f"wants_{i}") or None
-            is_ek = request.form.get(f"ek_{i}") == "on"
+            is_ek = f"ek_{i}" in request.form
             raw = request.form.get(f"unavail_{i}", "")
 
             worker = Worker(name, wants, is_ek)
 
-            # 👉 CSAK: YYYY-MM-DD, YYYY-MM-DD
             if raw:
-                days = [d.strip() for d in raw.split(",") if d.strip()]
-                for d in days:
-                    date_obj = datetime.strptime(d, "%Y-%m-%d").date()
-                    worker.unavailable_dates.append(date_obj)
+                for d in raw.split(","):
+                    d = d.strip()
+                    try:
+                        date_obj = datetime.strptime(d, "%Y-%m-%d").date()
+                        worker.unavailable_dates.append(date_obj)
+                    except ValueError:
+                        pass  # 👉 rossz dátumot eldobunk
 
             workers_list.append(worker)
 
-        # ───────── MŰSZAKOK / ELŐADÁSOK ─────────
+        # ───── ELŐADÁSOK ─────
         num_shows = int(request.form.get("num_shows", 0))
 
         for j in range(num_shows):
             title = request.form.get(f"title_{j}")
-            dt = datetime.strptime(
-                request.form.get(f"date_{j}"), "%Y-%m-%d %H:%M"
-            )
+            raw_dt = request.form.get(f"date_{j}")
+
+            try:
+                dt = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M")
+            except Exception:
+                continue  # 👉 ha rossz, kihagyjuk
+
             need = int(request.form.get(f"need_{j}", 10))
 
             roles = [
@@ -89,32 +98,24 @@ def dashboard():
 
 
 # ─────────────────────────────
-# BEOSZTÁS
+# SCHEDULE
 # ─────────────────────────────
 @app.route("/schedule")
 def schedule():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
-    result = generate_schedule(workers_list, shows_list)
+    try:
+        result = generate_schedule(workers_list, shows_list)
+    except Exception as e:
+        return f"<h1>Hiba a beosztás generálásakor</h1><pre>{e}</pre>"
+
     return render_template("schedule.html", schedule=result)
 
 
-if __name__ == "__main__":
-    import os
-
+# ─────────────────────────────
+# START
+# ─────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
-import traceback
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=True
-    )
-
-
