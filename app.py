@@ -108,7 +108,8 @@ def schedule():
         # ─── Súlyozott beosztás: ÉK dolgozók ritkábban ───
         for worker in workers_list:
             # weight=1 a normál dolgozó, weight=0.5 az ÉK dolgozó
-            worker.weight = 0.5 if worker.is_ek else 1
+            worker.weight = 0.2 if worker.is_ek
+            else 1
 
         # generate_schedule használja a weight attribútumot
         result = generate_schedule(workers_list, shows_list)
