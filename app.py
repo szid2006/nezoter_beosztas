@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from models import Worker, Role, Show
 from main import generate_schedule
 from datetime import datetime
+import csv
+from flask import Response
 import os
 
 app = Flask(__name__)
@@ -113,6 +115,26 @@ def schedule():
         return f"<h1>Hiba a beosztás generálásakor</h1><pre>{e}</pre>"
 
     return render_template("schedule.html", schedule=result)
+    @app.route("/export/csv")
+def export_csv():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+
+    result = generate_schedule(workers_list, shows_list)
+
+    def generate():
+        yield "Előadás;Szerep;Dolgozók\n"
+        for show_title, roles in result.items():
+            for role, names in roles.items():
+                yield f"{show_title};{role};{', '.join(names)}\n"
+
+    return Response(
+        generate(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=beosztas.csv"
+        }
+    )
 
 
 # ─────────────────────────────
