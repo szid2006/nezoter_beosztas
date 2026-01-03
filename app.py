@@ -109,7 +109,7 @@ def generate_schedule(workers, shows):
     for worker in workers:
         worker.weight = 0.2 if worker.is_ek else 1
 
-    shows_sorted = sorted(shows, key=lambda s: s.date)  # időrend
+    shows_sorted = sorted(shows, key=lambda s: s.dt)  # időrend
 
     for show in shows_sorted:
         assigned_in_show = set()  # már beosztott a show-on belül
@@ -118,12 +118,12 @@ def generate_schedule(workers, shows):
             # Elérhető dolgozók a dátumra, akik még nem kaptak szerepet a show-on
             available = [
                 w for w in workers
-                if show.date.date() not in w.unavailable_dates
+                if show.dt.date() not in w.unavailable_dates
                 and w not in assigned_in_show
             ]
 
             # Max 1 ÉK/nap
-            num_ek_today = sum(1 for w in assigned_by_date[show.date.date()] if w.is_ek)
+            num_ek_today = sum(1 for w in assigned_by_date[show.dt.date()] if w.is_ek)
             if num_ek_today >= 1:
                 available = [w for w in available if not w.is_ek]
 
@@ -134,8 +134,9 @@ def generate_schedule(workers, shows):
                 if len(last_dates) < 3:
                     filtered.append(w)
                     continue
+                # Ellenőrzés: utolsó 3 nap egymás után
                 if (last_dates[-1] - last_dates[-2]).days == 1 and (last_dates[-2] - last_dates[-3]).days == 1:
-                    continue  # túl sok egymásutáni show
+                    continue
                 filtered.append(w)
             available = filtered
 
@@ -154,12 +155,12 @@ def generate_schedule(workers, shows):
 
             # Tárolás
             schedule[show.title][role.name] = [w.name for w in assigned]
-            assigned_by_date[show.date.date()].extend(assigned)
+            assigned_by_date[show.dt.date()].extend(assigned)
             assigned_in_show.update(assigned)
 
             # Frissítjük az utolsó beosztott dátumokat
             for w in assigned:
-                last_assigned_dates[w].append(show.date.date())
+                last_assigned_dates[w].append(show.dt.date())
 
     return schedule
 
