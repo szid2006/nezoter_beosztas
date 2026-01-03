@@ -2,10 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, session, R
 from models import Worker, Role, Show
 from main import generate_schedule
 from datetime import datetime
-import csv
 import os
 import traceback
-from openpyxl import load_workbook
 
 app = Flask(__name__)
 app.secret_key = "titkos"
@@ -37,73 +35,13 @@ def login():
     return render_template("login.html")
 
 # ─────────────────────────────
-# DASHBOARD + EXCEL FELTÖLTÉS
+# DASHBOARD (csak manuális bevitel)
 # ─────────────────────────────
 @app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
-    # ───── EXCEL FELTÖLTÉS ─────
-    if request.method == "POST" and "file" in request.files:
-        file = request.files.get("file")
-        if not file:
-            return "Nincs fájl", 400
-
-        wb = load_workbook(file)
-        workers_list.clear()
-        shows_list.clear()
-
-        # ───── WORKERS ─────
-        ws_workers = wb["Workers"]
-        for row in ws_workers.iter_rows(min_row=2, values_only=True):
-            name, is_ek, wants, unavailable = row
-            if not name:
-                continue
-
-            worker = Worker(
-                name=name,
-                wants_to_see=wants if wants else None,
-                is_ek=(str(is_ek).lower() == "igen")
-            )
-
-            if unavailable:
-                for d in str(unavailable).split(","):
-                    try:
-                        worker.unavailable_dates.append(
-                            datetime.strptime(d.strip(), "%Y-%m-%d").date()
-                        )
-                    except ValueError:
-                        pass
-
-            workers_list.append(worker)
-
-        # ───── SHOWS ─────
-        ws_shows = wb["Shows"]
-        for row in ws_shows.iter_rows(min_row=2, values_only=True):
-            title, raw_dt, need = row
-            if not title or not raw_dt:
-                continue
-
-            try:
-                dt = datetime.strptime(str(raw_dt), "%Y-%m-%d %H:%M")
-            except ValueError:
-                continue
-
-            roles = [
-                Role("Nézőtér beülős", min(2, need)),
-                Role("Nézőtér csak csipog", min(2, max(0, need - 2))),
-                Role("Jolly joker", 1 if need >= 5 else 0, ek_allowed=False),
-                Role("Ruhatár bal", min(2, max(0, need - 5))),
-                Role("Ruhatár jobb", 1 if need >= 7 else 0),
-                Role("Ruhatár erkély", 1 if need >= 8 else 0),
-            ]
-            roles = [r for r in roles if r.max_count > 0]
-            shows_list.append(Show(title, dt, roles))
-
-        return redirect(url_for("schedule"))
-
-    # ───── MANUÁLIS ADATBEVITEL ─────
     if request.method == "POST":
         workers_list.clear()
         shows_list.clear()
@@ -127,7 +65,7 @@ def dashboard():
                             datetime.strptime(d.strip(), "%Y-%m-%d").date()
                         )
                     except ValueError:
-                        pass
+                        pass  # rossz dátum kihagyva
 
             workers_list.append(worker)
 
