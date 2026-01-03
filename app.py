@@ -1,77 +1,23 @@
 from flask import Flask, render_template, request, redirect, url_for, session, Response
+from models import Worker, Role, Show
 from datetime import datetime
+from collections import defaultdict
+import random
 import os
 import traceback
-import random
-from collections import defaultdict
 
-# ─────────────────────────────
-# MODELLEK
-# ─────────────────────────────
-class Worker:
-    def __init__(self, name, wants_to_see=None, is_ek=False):
-        self.name = name
-        self.wants_to_see = wants_to_see
-        self.is_ek = is_ek
-        self.unavailable_dates = []
-        self.weight = 1  # alap: normál dolgozó
-
-class Role:
-    def __init__(self, name, max_count, ek_allowed=True):
-        self.name = name
-        self.max_count = max_count
-        self.ek_allowed = ek_allowed
-
-class Show:
-    def __init__(self, title, date, roles):
-        self.title = title
-        self.date = date
-        self.roles = roles
-
-# ─────────────────────────────
-# GENERATE SCHEDULE
-# ─────────────────────────────
-def generate_schedule(workers, shows):
-    schedule = defaultdict(dict)
-    assigned_by_date = defaultdict(list)  # dátum -> list of assigned workers
-
-    for show in shows:
-        for role in show.roles:
-            # Elérhető dolgozók a dátumra
-            available = [w for w in workers if show.date.date() not in w.unavailable_dates]
-
-            # Max 1 ÉK/nap
-            num_ek_today = sum(1 for w in assigned_by_date[show.date.date()] if w.is_ek)
-            if num_ek_today >= 1:
-                available = [w for w in available if not w.is_ek]
-
-            # Súlyozás: ÉK ritkábban
-            weighted = []
-            for w in available:
-                count = max(int(w.weight * 10), 1)  # weight 1->10, 0.2->2
-                weighted.extend([w] * count)
-
-            if not weighted:
-                schedule[show.title][role.name] = []
-                continue
-
-            assign_count = min(role.max_count, len(weighted))
-            assigned = random.sample(weighted, assign_count)
-
-            schedule[show.title][role.name] = [w.name for w in assigned]
-            assigned_by_date[show.date.date()].extend(assigned)
-
-    return schedule
-
-# ─────────────────────────────
-# FLASK APP
-# ─────────────────────────────
 app = Flask(__name__)
 app.secret_key = "titkos"
 
+# ─────────────────────────────
+# BELÉPÉSI ADATOK
+# ─────────────────────────────
 USERNAME = "Szakács Zsuzsi"
 PASSWORD = "1234"
 
+# ─────────────────────────────
+# ADATTÁROLÁS
+# ─────────────────────────────
 workers_list = []
 shows_list = []
 
@@ -81,13 +27,16 @@ shows_list = []
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if request.form.get("username") == USERNAME and request.form.get("password") == PASSWORD:
+        if (
+            request.form.get("username") == USERNAME
+            and request.form.get("password") == PASSWORD
+        ):
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
     return render_template("login.html")
 
 # ─────────────────────────────
-# DASHBOARD (manuális bevitel)
+# DASHBOARD (csak manuális bevitel)
 # ─────────────────────────────
 @app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
@@ -98,7 +47,7 @@ def dashboard():
         workers_list.clear()
         shows_list.clear()
 
-        # Dolgozók
+        # ───── DOLGOZÓK ─────
         num_workers = int(request.form.get("num_workers", 0))
         for i in range(num_workers):
             name = request.form.get(f"name_{i}")
@@ -110,22 +59,23 @@ def dashboard():
             raw = request.form.get(f"unavail_{i}", "")
 
             worker = Worker(name, wants, is_ek)
-            worker.weight = 0.2 if is_ek else 1
-
             if raw:
                 for d in raw.split(","):
                     try:
-                        worker.unavailable_dates.append(datetime.strptime(d.strip(), "%Y-%m-%d").date())
+                        worker.unavailable_dates.append(
+                            datetime.strptime(d.strip(), "%Y-%m-%d").date()
+                        )
                     except ValueError:
                         pass
 
             workers_list.append(worker)
 
-        # Előadások
+        # ───── ELŐADÁSOK ─────
         num_shows = int(request.form.get("num_shows", 0))
         for j in range(num_shows):
             title = request.form.get(f"title_{j}")
             raw_dt = request.form.get(f"date_{j}")
+
             try:
                 dt = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M")
             except Exception:
@@ -148,7 +98,73 @@ def dashboard():
     return render_template("dashboard.html")
 
 # ─────────────────────────────
-# SCHEDULE
+# BEOSZTÁS GENERÁLÁS
+# ─────────────────────────────
+def generate_schedule(workers, shows):
+    schedule = defaultdict(dict)
+    assigned_by_date = defaultdict(list)  # dátum -> list of assigned workers
+    last_assigned_dates = {w: [] for w in workers}  # dolgozó -> list of dátumok
+
+    # Súlyozás: ÉK dolgozók ritkábban
+    for worker in workers:
+        worker.weight = 0.2 if worker.is_ek else 1
+
+    shows_sorted = sorted(shows, key=lambda s: s.date)  # időrend
+
+    for show in shows_sorted:
+        assigned_in_show = set()  # már beosztott a show-on belül
+
+        for role in show.roles:
+            # Elérhető dolgozók a dátumra, akik még nem kaptak szerepet a show-on
+            available = [
+                w for w in workers
+                if show.date.date() not in w.unavailable_dates
+                and w not in assigned_in_show
+            ]
+
+            # Max 1 ÉK/nap
+            num_ek_today = sum(1 for w in assigned_by_date[show.date.date()] if w.is_ek)
+            if num_ek_today >= 1:
+                available = [w for w in available if not w.is_ek]
+
+            # Max 3 egymás utáni nap
+            filtered = []
+            for w in available:
+                last_dates = sorted(last_assigned_dates[w])
+                if len(last_dates) < 3:
+                    filtered.append(w)
+                    continue
+                if (last_dates[-1] - last_dates[-2]).days == 1 and (last_dates[-2] - last_dates[-3]).days == 1:
+                    continue  # túl sok egymásutáni show
+                filtered.append(w)
+            available = filtered
+
+            # Súlyozás: ÉK ritkábban
+            weighted = []
+            for w in available:
+                count = max(int(w.weight * 10), 1)
+                weighted.extend([w] * count)
+
+            if not weighted:
+                schedule[show.title][role.name] = []
+                continue
+
+            assign_count = min(role.max_count, len(weighted))
+            assigned = random.sample(weighted, assign_count)
+
+            # Tárolás
+            schedule[show.title][role.name] = [w.name for w in assigned]
+            assigned_by_date[show.date.date()].extend(assigned)
+            assigned_in_show.update(assigned)
+
+            # Frissítjük az utolsó beosztott dátumokat
+            for w in assigned:
+                last_assigned_dates[w].append(show.date.date())
+
+    return schedule
+
+# ─────────────────────────────
+# BEOSZTÁS ROUTE
 # ─────────────────────────────
 @app.route("/schedule")
 def schedule():
