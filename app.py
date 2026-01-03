@@ -1,22 +1,25 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, Response
 from models import Worker, Role, Show
 from main import generate_schedule
 from datetime import datetime
 import csv
-from flask import Response
 import os
+import traceback
 
 app = Flask(__name__)
 app.secret_key = "titkos"
 
-USERNAME = "Szabó Szidónia"
-PASSWORD = "12345"
+# ─────────────────────────────
+# BELÉPÉSI ADATOK
+# ─────────────────────────────
 USERNAME = "Szakács Zsuzsi"
 PASSWORD = "1234"
 
+# ─────────────────────────────
+# ADATTÁROLÁS
+# ─────────────────────────────
 workers_list = []
 shows_list = []
-
 
 # ─────────────────────────────
 # LOGIN
@@ -30,8 +33,8 @@ def login():
         ):
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
-    return render_template("login.html")
 
+    return render_template("login.html")
 
 # ─────────────────────────────
 # DASHBOARD
@@ -63,10 +66,11 @@ def dashboard():
                 for d in raw.split(","):
                     d = d.strip()
                     try:
-                        date_obj = datetime.strptime(d, "%Y-%m-%d").date()
-                        worker.unavailable_dates.append(date_obj)
+                        worker.unavailable_dates.append(
+                            datetime.strptime(d, "%Y-%m-%d").date()
+                        )
                     except ValueError:
-                        pass  # 👉 rossz dátumot eldobunk
+                        pass  # rossz dátum kihagyva
 
             workers_list.append(worker)
 
@@ -80,7 +84,7 @@ def dashboard():
             try:
                 dt = datetime.strptime(raw_dt, "%Y-%m-%d %H:%M")
             except Exception:
-                continue  # 👉 ha rossz, kihagyjuk
+                continue
 
             need = int(request.form.get(f"need_{j}", 10))
 
@@ -100,9 +104,8 @@ def dashboard():
 
     return render_template("dashboard.html")
 
-
 # ─────────────────────────────
-# SCHEDULE
+# BEOSZTÁS
 # ─────────────────────────────
 @app.route("/schedule")
 def schedule():
@@ -111,11 +114,14 @@ def schedule():
 
     try:
         result = generate_schedule(workers_list, shows_list)
-    except Exception as e:
-        return f"<h1>Hiba a beosztás generálásakor</h1><pre>{e}</pre>"
+        return render_template("schedule.html", schedule=result)
+    except Exception:
+        return f"<pre>{traceback.format_exc()}</pre>", 500
 
-    return render_template("schedule.html", schedule=result)
-    @app.route("/export/csv")
+# ─────────────────────────────
+# CSV EXPORT
+# ─────────────────────────────
+@app.route("/export/csv")
 def export_csv():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
@@ -135,7 +141,6 @@ def export_csv():
             "Content-Disposition": "attachment; filename=beosztas.csv"
         }
     )
-
 
 # ─────────────────────────────
 # START
