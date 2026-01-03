@@ -15,6 +15,9 @@ PASSWORD = "1234"
 workers_list = []
 shows_list = []
 
+# ─────────────────────────────
+# LOGIN
+# ─────────────────────────────
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -23,6 +26,9 @@ def login():
             return redirect(url_for("dashboard"))
     return render_template("login.html")
 
+# ─────────────────────────────
+# DASHBOARD (csak manuális bevitel)
+# ─────────────────────────────
 @app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if not session.get("logged_in"):
@@ -74,8 +80,9 @@ def dashboard():
 
     return render_template("dashboard.html")
 
-
-# ───────────── BEOSZTÁS GENERÁLÁS ─────────────
+# ─────────────────────────────
+# BEOSZTÁS GENERÁLÁS
+# ─────────────────────────────
 def generate_schedule(workers, shows):
     schedule = defaultdict(dict)
     assigned_by_date = defaultdict(list)
@@ -83,16 +90,19 @@ def generate_schedule(workers, shows):
 
     # Súlyozás: ÉK ritkábban
     for worker in workers:
-        worker.weight = 0.2 if worker.is_ek else 1
+        worker.weight = 1 if not worker.is_ek else 0.3  # ÉK ritkábban
 
-    shows_sorted = sorted(shows, key=lambda s: s.dt)
+    shows_sorted = sorted(shows, key=lambda s: s.dt)  # hibamentes
 
     for show in shows_sorted:
         assigned_in_show = set()
 
         for role in show.roles:
             # Elérhető dolgozók
-            available = [w for w in workers if show.dt.date() not in w.unavailable_dates and w not in assigned_in_show]
+            available = [
+                w for w in workers
+                if show.dt.date() not in w.unavailable_dates and w not in assigned_in_show
+            ]
 
             # Max 1 ÉK/nap
             num_ek_today = sum(1 for w in assigned_by_date[show.dt.date()] if w.is_ek)
@@ -102,16 +112,16 @@ def generate_schedule(workers, shows):
             # Max 3 egymás utáni nap
             filtered = []
             for w in available:
-                last_dates = sorted(last_assigned_dates[w])
-                if len(last_dates) < 3:
+                dates = sorted(last_assigned_dates[w])
+                if len(dates) < 3:
                     filtered.append(w)
                     continue
-                if (last_dates[-1] - last_dates[-2]).days == 1 and (last_dates[-2] - last_dates[-3]).days == 1:
+                if (dates[-1] - dates[-2]).days == 1 and (dates[-2] - dates[-3]).days == 1:
                     continue
                 filtered.append(w)
             available = filtered
 
-            # Súlyozás ÉK ritkábban
+            # Súlyozott választás (ÉK ritkábban)
             weighted = []
             for w in available:
                 count = max(int(w.weight * 10), 1)
@@ -121,19 +131,24 @@ def generate_schedule(workers, shows):
                 schedule[show.title][role.name] = []
                 continue
 
+            # Assign role
             assign_count = min(role.max_count, len(weighted))
             assigned = random.sample(weighted, assign_count)
+
+            # Ne legyen ugyanaz az ember többször ugyanabban a show-ban
+            assigned = list({w for w in assigned})
 
             schedule[show.title][role.name] = [w.name for w in assigned]
             assigned_by_date[show.dt.date()].extend(assigned)
             assigned_in_show.update(assigned)
-
             for w in assigned:
                 last_assigned_dates[w].append(show.dt.date())
 
     return schedule
 
-
+# ─────────────────────────────
+# BEOSZTÁS OLDAL
+# ─────────────────────────────
 @app.route("/schedule")
 def schedule():
     if not session.get("logged_in"):
@@ -145,7 +160,9 @@ def schedule():
     except Exception:
         return f"<pre>{traceback.format_exc()}</pre>", 500
 
-
+# ─────────────────────────────
+# CSV EXPORT
+# ─────────────────────────────
 @app.route("/export/csv")
 def export_csv():
     if not session.get("logged_in"):
@@ -160,7 +177,9 @@ def export_csv():
     return Response(generate(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=beosztas.csv"})
 
-
+# ─────────────────────────────
+# START
+# ─────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
