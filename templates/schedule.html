@@ -1,19 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Beosztás</title>
+    <title>Beosztás</title>
 </head>
 <body>
+
 <h2>Generált beosztás</h2>
+
 {% for show in schedule %}
-    <h3>{{ show.title }} - {{ show.date.strftime("%Y-%m-%d %H:%M") }}</h3>
+    <h3>{{ show.title }} – {{ show.date }}</h3>
+
     <ul>
     {% for role, names in show.roles.items() %}
-        <li><b>{{ role }}:</b> {{ names|join(", ") }}</li>
+        <li>
+            <b>{{ role }}:</b>
+            {% if names %}
+                {{ names | join(", ") }}
+            {% else %}
+                —
+            {% endif %}
+        </li>
     {% endfor %}
     </ul>
     <hr>
 {% endfor %}
+
 <a href="{{ url_for('dashboard') }}">🔙 Vissza a Dashboardra</a>
+
 </body>
 </html>
