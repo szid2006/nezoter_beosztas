@@ -112,7 +112,8 @@ def generate_schedule(workers, shows):
                 if show.start.date() in w.unavailable_dates:
                     continue
 
-                recent = last_assigned[w.name]
+                # Itt a lényeg: üres lista kezelése
+                recent = last_assigned.get(w.name, [])
                 if recent and (show.start.date() - max(recent)).days < 3:
                     continue
 
@@ -130,6 +131,7 @@ def generate_schedule(workers, shows):
                     ek_used += 1
 
     return result
+
 
 
 @app.route("/schedule")
