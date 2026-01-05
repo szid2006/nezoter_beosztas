@@ -11,20 +11,18 @@
 {% if schedule %}
     {% for show_title, roles in schedule.items() %}
         <h3>{{ show_title }}</h3>
-
         <ul>
         {% for role, names in roles.items() %}
             <li>
                 <b>{{ role }}:</b>
                 {% if names %}
-                    {{ names | default([]) | join(", ") }}
+                    {{ names | join(", ") }}
                 {% else %}
                     —
                 {% endif %}
             </li>
         {% endfor %}
         </ul>
-
         <hr>
     {% endfor %}
 {% else %}
@@ -32,7 +30,6 @@
 {% endif %}
 
 <br>
-
 <a href="{{ url_for('export_csv') }}">📄 CSV letöltése</a>
 &nbsp;&nbsp;|&nbsp;&nbsp;
 <a href="{{ url_for('dashboard') }}">🔙 Vissza a főoldalra</a>
