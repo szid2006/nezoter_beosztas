@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from models import Worker, Role, Show
-from rules import is_available, ek_allowed
 from datetime import datetime
 from collections import defaultdict
 import io
@@ -89,7 +88,10 @@ def generate_schedule(workers, shows):
 
     for show in shows_sorted:
         used_today = set()
-        ek_used = 0
+        ek_assigned_today = 0
+        assigned_total = 0
+        need_total = sum(role.max_count for role in show.roles)
+        max_total = min(need_total, len(workers))
 
         for role in show.roles:
             eligible = []
@@ -97,29 +99,38 @@ def generate_schedule(workers, shows):
             for w in workers:
                 if w.name in used_today:
                     continue
-                if w.is_ek and ek_used >= 1:
-                    continue
                 if not role.ek_allowed and w.is_ek:
                     continue
                 if show.start.date() in w.unavailable_dates:
                     continue
-
                 recent = last_assigned.get(w.name, [])
                 if recent and (show.start.date() - max(recent)).days < 3:
                     continue
-
                 eligible.append(w)
 
+            # ÉK-eket később választjuk, kevesebbszer
             eligible.sort(key=lambda w: (w.is_ek, assignment_count[w.name]))
-            chosen = eligible[:role.max_count]
+
+            remaining_needed = max_total - assigned_total
+            assign_count = min(len(eligible), role.max_count, remaining_needed)
+            chosen = []
+
+            for w in eligible:
+                if len(chosen) >= assign_count:
+                    break
+                if w.is_ek and ek_assigned_today >= 1:
+                    continue
+                chosen.append(w)
+                if w.is_ek:
+                    ek_assigned_today += 1
 
             for w in chosen:
-                result[show.title][role.name].append(w.name)
+                name_display = f"{w.name} (ÉK)" if w.is_ek else w.name
+                result[show.title][role.name].append(name_display)
                 assignment_count[w.name] += 1
-                used_today.add(w.name)
                 last_assigned[w.name].append(show.start.date())
-                if w.is_ek:
-                    ek_used += 1
+                used_today.add(w.name)
+                assigned_total += 1
 
     return result
 
