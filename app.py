@@ -1,11 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from models import Worker, Role, Show
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 import io
 import csv
 import os
-import random
 
 app = Flask(__name__)
 app.secret_key = "titkos"
@@ -84,30 +83,29 @@ def generate_schedule(workers, shows):
     schedule_result = defaultdict(lambda: defaultdict(list))
 
     for show in sorted(shows, key=lambda s: s.start):
-        used_today = set()
+        used_today = set()  # egy ember csak egyszer
         ek_assigned = False
         assigned_total = 0
         need_total = sum(role.max_count for role in show.roles)
 
-        # Lapított szereplista, hogy könnyebb legyen kiosztani
+        # Lista az összes slothoz a szerepekből
         role_slots = []
         for role in show.roles:
             for _ in range(role.max_count):
                 role_slots.append(role)
 
-        random.shuffle(role_slots)  # rotáció miatt
-
+        # determinisztikus sorrend: prioritás szerint
         for role in role_slots:
             if assigned_total >= need_total:
-                break
+                break  # már mindenkit kiosztottunk
 
-            # Eligible dolgozók kiválasztása
+            # eligible dolgozók kiválasztása
             eligible = []
             for w in workers:
                 if w.name in used_today:
                     continue
                 if w.is_ek and ek_assigned:
-                    continue  # csak 1 ÉK a műszakban
+                    continue  # max 1 ÉK
                 if show.start.date() in w.unavailable_dates:
                     continue
                 recent = getattr(w, "previous_roles", [])
@@ -118,11 +116,11 @@ def generate_schedule(workers, shows):
             if not eligible:
                 continue
 
-            # Prefer non-ÉK, kevesebbet beosztott dolgozók először
+            # Prefer non-ÉK, kevesebb beosztott először
             eligible.sort(key=lambda w: (w.is_ek, getattr(w, "assigned_count", 0)))
             chosen = eligible[0]
 
-            # Beosztás
+            # Névválasztás ÉK jelzéssel
             name_display = f"{chosen.name} (ÉK)" if chosen.is_ek else chosen.name
             schedule_result[show.title][role.name].append(name_display)
 
