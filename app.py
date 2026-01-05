@@ -87,14 +87,16 @@ def generate_schedule(workers, shows):
     shows_sorted = sorted(shows, key=lambda s: s.start)
 
     for show in shows_sorted:
-        used_today = set()
-        ek_assigned_today = 0
+        used_today = set()  # egy ember csak egyszer a műszakban
         assigned_total = 0
-        need_total = sum(role.max_count for role in show.roles)
-        max_total = min(need_total, len(workers))
+        show_needed = sum(role.max_count for role in show.roles)
 
         for role in show.roles:
+            if assigned_total >= show_needed:  # már mindenkit kiosztottunk
+                break
+
             eligible = []
+            ek_assigned_in_role = 0
 
             for w in workers:
                 if w.name in used_today:
@@ -111,18 +113,18 @@ def generate_schedule(workers, shows):
             # ÉK-eket később választjuk, kevesebbszer
             eligible.sort(key=lambda w: (w.is_ek, assignment_count[w.name]))
 
-            remaining_needed = max_total - assigned_total
+            remaining_needed = show_needed - assigned_total
             assign_count = min(len(eligible), role.max_count, remaining_needed)
             chosen = []
 
             for w in eligible:
                 if len(chosen) >= assign_count:
                     break
-                if w.is_ek and ek_assigned_today >= 1:
+                if w.is_ek and ek_assigned_in_role >= 1:
                     continue
                 chosen.append(w)
                 if w.is_ek:
-                    ek_assigned_today += 1
+                    ek_assigned_in_role += 1
 
             for w in chosen:
                 name_display = f"{w.name} (ÉK)" if w.is_ek else w.name
@@ -138,11 +140,9 @@ def generate_schedule(workers, shows):
 @app.route("/schedule")
 def schedule():
     schedule_dict = generate_schedule(workers_list, shows_list)
-    if not schedule_dict:
-        schedule_dict = {}
     return render_template("schedule.html", schedule=schedule_dict)
 
-# ===== EXPORT CSV =====
+# ===== EXPORT CSV (placeholder) =====
 @app.route("/export_csv")
 def export_csv():
     return "CSV export még nincs implementálva, de a schedule oldal működik."
