@@ -16,7 +16,7 @@
             <li>
                 <b>{{ role }}:</b>
                 {% if names %}
-                    {{ names | join(", ") }}
+                    {{ names | default([]) | join(", ") }}
                 {% else %}
                     —
                 {% endif %}
