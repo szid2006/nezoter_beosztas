@@ -5,6 +5,7 @@ from datetime import datetime
 from collections import defaultdict
 import io
 import csv
+import os
 
 app = Flask(__name__)
 app.secret_key = "titkos"
@@ -126,13 +127,16 @@ def generate_schedule(workers, shows):
 @app.route("/schedule")
 def schedule():
     schedule_dict = generate_schedule(workers_list, shows_list)
+    if not schedule_dict:
+        schedule_dict = {}
     return render_template("schedule.html", schedule=schedule_dict)
 
-# ===== EXPORT CSV (IDEIGLENES) =====
+# ===== EXPORT CSV =====
 @app.route("/export_csv")
 def export_csv():
     return "CSV export még nincs implementálva, de a schedule oldal működik."
 
 # ===== RUN =====
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
