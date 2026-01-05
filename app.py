@@ -1,11 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from models import Worker, Role, Show
-from datetime import datetime, timedelta
+from rules import is_available, ek_allowed
+from datetime import datetime
 from collections import defaultdict
-import csv
 import io
-import os
-import random
+import csv
 
 app = Flask(__name__)
 app.secret_key = "titkos"
@@ -16,7 +15,7 @@ PASSWORD = "1234"
 workers_list = []
 shows_list = []
 
-
+# ===== LOGIN =====
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -25,7 +24,7 @@ def login():
             return redirect(url_for("dashboard"))
     return render_template("login.html")
 
-
+# ===== DASHBOARD =====
 @app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if not session.get("logged_in"):
@@ -40,25 +39,20 @@ def dashboard():
         if workers_file:
             data = io.StringIO(workers_file.stream.read().decode("utf-8"))
             reader = csv.DictReader(data)
-
             for row in reader:
                 worker = Worker(
                     name=row["name"].strip(),
-                    wants=row.get("wants") or None,
+                    wants_to_see=row.get("wants") or None,
                     is_ek=row.get("is_ek", "0") == "1"
                 )
-
                 unavailable = row.get("unavailable", "")
                 for d in unavailable.split(","):
                     d = d.strip()
                     if d:
                         try:
-                            worker.unavailable_dates.append(
-                                datetime.strptime(d, "%Y-%m-%d").date()
-                            )
+                            worker.unavailable_dates.append(datetime.strptime(d, "%Y-%m-%d").date())
                         except ValueError:
                             pass
-
                 workers_list.append(worker)
 
         # ===== SHOWS CSV =====
@@ -66,11 +60,9 @@ def dashboard():
         if shows_file:
             data = io.StringIO(shows_file.stream.read().decode("utf-8"))
             reader = csv.DictReader(data)
-
             for row in reader:
                 dt = datetime.strptime(row["datetime"], "%Y-%m-%d %H:%M")
                 need = int(row["need"])
-
                 roles = [
                     Role("Nézőtér beülős", min(2, need)),
                     Role("Nézőtér csak csipog", min(2, max(0, need - 2))),
@@ -79,7 +71,6 @@ def dashboard():
                     Role("Ruhatár jobb", 1 if need >= 8 else 0),
                     Role("Ruhatár erkély", 1 if need >= 9 else 0),
                 ]
-
                 roles = [r for r in roles if r.max_count > 0]
                 shows_list.append(Show(row["title"], dt, roles))
 
@@ -87,7 +78,7 @@ def dashboard():
 
     return render_template("dashboard.html")
 
-
+# ===== SCHEDULE GENERATION =====
 def generate_schedule(workers, shows):
     result = defaultdict(lambda: defaultdict(list))
     assignment_count = defaultdict(int)
@@ -112,7 +103,6 @@ def generate_schedule(workers, shows):
                 if show.start.date() in w.unavailable_dates:
                     continue
 
-                # Itt a lényeg: üres lista kezelése
                 recent = last_assigned.get(w.name, [])
                 if recent and (show.start.date() - max(recent)).days < 3:
                     continue
@@ -132,15 +122,17 @@ def generate_schedule(workers, shows):
 
     return result
 
-
-
+# ===== SCHEDULE ROUTE =====
 @app.route("/schedule")
 def schedule():
-    schedule = generate_schedule(workers_list, shows_list)
-    return render_template("schedule.html", schedule=schedule)
+    schedule_dict = generate_schedule(workers_list, shows_list)
+    return render_template("schedule.html", schedule=schedule_dict)
 
+# ===== EXPORT CSV (IDEIGLENES) =====
+@app.route("/export_csv")
+def export_csv():
+    return "CSV export még nincs implementálva, de a schedule oldal működik."
 
-# ===== RENDER KOMPATIBILIS INDÍTÁS =====
+# ===== RUN =====
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
