@@ -5,6 +5,7 @@ from collections import defaultdict
 import io
 import csv
 import os
+import random
 
 app = Flask(__name__)
 app.secret_key = "titkos"
@@ -78,63 +79,66 @@ def dashboard():
 
     return render_template("dashboard.html")
 
-# ===== SCHEDULE GENERATION =====
+# ===== GENERATE SCHEDULE =====
 def generate_schedule(workers, shows):
-    result = defaultdict(lambda: defaultdict(list))
-    assignment_count = defaultdict(int)
-    last_assigned = defaultdict(list)
+    schedule_result = defaultdict(lambda: defaultdict(list))
 
-    shows_sorted = sorted(shows, key=lambda s: s.start)
-
-    for show in shows_sorted:
-        used_today = set()  # egy ember csak egyszer a műszakban
+    for show in sorted(shows, key=lambda s: s.start):
+        used_today = set()
+        ek_assigned = False
         assigned_total = 0
-        show_needed = sum(role.max_count for role in show.roles)
+        need_total = sum(role.max_count for role in show.roles)
 
+        # Lapított szereplista, hogy könnyebb legyen kiosztani
+        role_slots = []
         for role in show.roles:
-            if assigned_total >= show_needed:  # már mindenkit kiosztottunk
+            for _ in range(role.max_count):
+                role_slots.append(role)
+
+        random.shuffle(role_slots)  # rotáció miatt
+
+        for role in role_slots:
+            if assigned_total >= need_total:
                 break
 
+            # Eligible dolgozók kiválasztása
             eligible = []
-            ek_assigned_in_role = 0
-
             for w in workers:
                 if w.name in used_today:
                     continue
-                if not role.ek_allowed and w.is_ek:
-                    continue
+                if w.is_ek and ek_assigned:
+                    continue  # csak 1 ÉK a műszakban
                 if show.start.date() in w.unavailable_dates:
                     continue
-                recent = last_assigned.get(w.name, [])
-                if recent and (show.start.date() - max(recent)).days < 3:
+                recent = getattr(w, "previous_roles", [])
+                if recent and (show.start.date() - max(recent, default=show.start.date())).days < 3:
                     continue
                 eligible.append(w)
 
-            # ÉK-eket később választjuk, kevesebbszer
-            eligible.sort(key=lambda w: (w.is_ek, assignment_count[w.name]))
+            if not eligible:
+                continue
 
-            remaining_needed = show_needed - assigned_total
-            assign_count = min(len(eligible), role.max_count, remaining_needed)
-            chosen = []
+            # Prefer non-ÉK, kevesebbet beosztott dolgozók először
+            eligible.sort(key=lambda w: (w.is_ek, getattr(w, "assigned_count", 0)))
+            chosen = eligible[0]
 
-            for w in eligible:
-                if len(chosen) >= assign_count:
-                    break
-                if w.is_ek and ek_assigned_in_role >= 1:
-                    continue
-                chosen.append(w)
-                if w.is_ek:
-                    ek_assigned_in_role += 1
+            # Beosztás
+            name_display = f"{chosen.name} (ÉK)" if chosen.is_ek else chosen.name
+            schedule_result[show.title][role.name].append(name_display)
 
-            for w in chosen:
-                name_display = f"{w.name} (ÉK)" if w.is_ek else w.name
-                result[show.title][role.name].append(name_display)
-                assignment_count[w.name] += 1
-                last_assigned[w.name].append(show.start.date())
-                used_today.add(w.name)
-                assigned_total += 1
+            # Frissítés
+            used_today.add(chosen.name)
+            assigned_total += 1
+            if chosen.is_ek:
+                ek_assigned = True
+            if not hasattr(chosen, "assigned_count"):
+                chosen.assigned_count = 0
+            chosen.assigned_count += 1
+            if not hasattr(chosen, "previous_roles"):
+                chosen.previous_roles = []
+            chosen.previous_roles.append(show.start.date())
 
-    return result
+    return schedule_result
 
 # ===== SCHEDULE ROUTE =====
 @app.route("/schedule")
@@ -142,7 +146,7 @@ def schedule():
     schedule_dict = generate_schedule(workers_list, shows_list)
     return render_template("schedule.html", schedule=schedule_dict)
 
-# ===== EXPORT CSV (placeholder) =====
+# ===== EXPORT CSV =====
 @app.route("/export_csv")
 def export_csv():
     return "CSV export még nincs implementálva, de a schedule oldal működik."
