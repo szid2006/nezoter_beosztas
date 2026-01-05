@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Beosztás</title>
 </head>
-
 <body>
 
 <h2>Generált beosztás</h2>
@@ -18,7 +17,7 @@
             <li>
                 <b>{{ role }}:</b>
                 {% if names %}
-                    {{ names | join(", ") }}
+                    {{ names | default([]) | join(", ") }}
                 {% else %}
                     —
                 {% endif %}
