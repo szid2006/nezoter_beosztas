@@ -5,7 +5,7 @@ class Worker:
         self.is_ek = is_ek
         self.assigned_count = 0
         self.previous_roles = []
-        self.unavailable_dates = []  
+        self.unavailable_dates = []
 
 class Role:
     def __init__(self, name, max_count, ek_allowed=True):
